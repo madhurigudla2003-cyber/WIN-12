@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WIN12 - Write from your heart</title>
+
+  <style>
+    body {
+      background: linear-gradient(to right, #f5efe6, #f1e4d3);
+      font-family: Georgia, serif;
+      padding: 40px;
+      max-width: 900px;
+      margin: auto;
+    }
+
+    h2, h3 {
+      text-align: center;
+      color: #4b3b2f;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin: 6px 0;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #c7b9a6;
+    }
+
+    button {
+      width: 100%;
+      background: #7b5e3b;
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #5f452b;
+    }
+
+    textarea {
+      width: 100%;
+      height: 280px;
+      font-size: 18px;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #c7b9a6;
+      background: #fffaf0;
+    }
+
+    #time {
+      text-align: right;
+      color: green;
+      font-size: 14px;
+    }
+    .session {
+      background: #fff;
+      padding: 15px;
+      margin: 12px 0;
+      border-radius: 8px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .session:hover {
+      transform: scale(1.01);
+    }
+
+    .deleteBtn {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      color: red;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #teacherSection h4 {
+      margin-top: 25px;
+      border-bottom: 2px solid #ddd;
+      color: #5f452b;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Write from your heart</h2>
+
+<input id="name" placeholder="Your Name">
+<input id="email" placeholder="Your Email">
+
+<select id="role">
+  <option value="student">Student</option>
+  <option value="teacher">Teacher</option>
+</select>
+
+<br><br>
+<button onclick="login()">Enter</button>
+
+<!-- STUDENT -->
+<div id="editorSection" style="display:none">
+  <textarea id="editor" placeholder="Start writing peacefully..."></textarea>
+  <p id="time"></p>
+
+  <h3>Your Previous Writings</h3>
+  <div id="history"></div>
+</div>
+<!-- TEACHER -->
+<div id="teacherSection" style="display:none">
+  <h3>All Students' Writings</h3>
+  <div id="allWritings"></div>
+</div>
+
+<script>
+let userId = "";
+let role = "";
+let editIndex = null;
+
+const editor = document.getElementById("editor");
+const timeDiv = document.getElementById("time");
+const historyDiv = document.getElementById("history");
+const allDiv = document.getElementById("allWritings");
+
+/* LOGIN */
+function login() {
+  userId = document.getElementById("email").value;
+  role = document.getElementById("role").value;
+
+  if (!userId) {
+    alert("Please enter email");
+    return;
+  }
+
+  if (role === "student") {
+    editorSection.style.display = "block";
+    teacherSection.style.display = "none";
+    loadHistory();
+  } else {
+    teacherSection.style.display = "block";
+    editorSection.style.display = "none";
+    loadAllWritings();
+  }
+}
+
+/* AUTO-SAVE + REWRITE */
+setInterval(() => {
+  if (role !== "student") return;
+  if (!editor.value.trim()) return;
+
+  const data = JSON.parse(localStorage.getItem(userId)) || [];
+  const time = new Date().toISOString();
+
+  if (editIndex !== null) {
+    // rewrite same entry
+    data[editIndex] = { content: editor.value, time };
+  } else {
+    // new entry
+    data.push({ content: editor.value, time });
+  }
+
+  localStorage.setItem(userId, JSON.stringify(data));
+  timeDiv.innerText = "Saved at " + new Date(time).toLocaleTimeString();
+  loadHistory();
+}, 5000);
+
+/* LOAD STUDENT HISTORY */
+function loadHistory() {
+  const data = JSON.parse(localStorage.getItem(userId)) || [];
+  historyDiv.innerHTML = "";
+
+  data.forEach((s, index) => {
+    historyDiv.innerHTML += `
+      <div class="session" onclick="startRewrite(${index})">
+        <span class="deleteBtn" onclick="deleteStudent(event, ${index})">✖</span>
+        <small>${new Date(s.time).toLocaleString()}</small>
+        <p>${s.content.substring(0,100)}...</p>
+      </div>
+    `;
+  });
+}
+
+/* CLICK TO REWRITE */
+function startRewrite(index) {
+  const data = JSON.parse(localStorage.getItem(userId)) || [];
+  editor.value = data[index].content;
+  editIndex = index;
+}
+
+/* DELETE STUDENT ENTRY */
+function deleteStudent(e, index) {
+  e.stopPropagation();
+  const data = JSON.parse(localStorage.getItem(userId)) || [];
+  data.splice(index, 1);
+  localStorage.setItem(userId, JSON.stringify(data));
+  editor.value = "";
+  editIndex = null;
+  loadHistory();
+}
+
+/* TEACHER VIEW */
+function loadAllWritings() {
+  allDiv.innerHTML = "";
+
+  for (let key in localStorage) {
+    const data = JSON.parse(localStorage.getItem(key));
+    if (!Array.isArray(data)) continue;
+
+    let html = `<h4>${key}</h4>`;
+
+    data.forEach((s, i) => {
+      html += `
+        <div class="session">
+          <span class="deleteBtn" onclick="deleteTeacher('${key}', ${i})">✖</span>
+          <small>${new Date(s.time).toLocaleString()}</small>
+          <p>${s.content.substring(0,100)}...</p>
+        </div>
+      `;
+    });
+
+    allDiv.innerHTML += html;
+  }
+}
+
+/* DELETE BY TEACHER */
+function deleteTeacher(user, index) {
+  const data = JSON.parse(localStorage.getItem(user)) || [];
+  data.splice(index, 1);
+  localStorage.setItem(user, JSON.stringify(data));
+  loadAllWritings();
+}
+</script>
+
+</body>
+</html>
